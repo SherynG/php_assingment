@@ -1,48 +1,53 @@
 <?php
 
-// 1. Connect to the database
+
 $database = connectToDB();
 
+// Get user_id from session
+$user_id = $_SESSION['user']['id'] ?? null;
 
+// Check if user is logged in
+if (!$user_id) {
+    $_SESSION['error'] = "You need to be logged in to view your bookmarks.";
+    header("Location: /login");
+    exit;
+}
 
-require "parts/header_a.php";
+// Fetch all bookmarks for the logged-in user
+$sql = "SELECT books.id, books.title, books.author, books.image_url, bookmarks.id AS bookmark_id 
+        FROM books 
+        INNER JOIN bookmarks ON books.id = bookmarks.book_id 
+        WHERE bookmarks.user_id = :user_id";
+$query = $database->prepare($sql);
+$query->execute(['user_id' => $user_id]);
+$bookmarks = $query->fetchAll(PDO::FETCH_ASSOC);
+
+require 'parts/header.php';
 ?>
 
-<div class="container mt-5 mb-2 mx-auto" style="max-width: 900px;">
+<div class="container mt-5">
     <h2>Your Bookmarked Books</h2>
     <div class="row row-cols-1 row-cols-md-3 g-4">
-        <?php if (isset($bookmark) && is_array($bookmark) && count($bookmark) > 0) : ?>
-            <?php foreach($bookmarks as $book) : ?>
+        <?php if (!empty($bookmarks)) : ?>
+            <?php foreach ($bookmarks as $bookmark) : ?>
                 <div class="col">
-
-                    <!-- Book Item -->
                     <div class="card h-100">
-                        <form method="POST" action="user/bookmark">
-                            <input type="hidden" name="id" value="<?= $book['id']; ?>">
-                            <button class="btn btn-link p-0 m-0" style="position: absolute; top: 10px; right: 10px;">
-                                <i class="bi bi-heart-fill" style="font-size: 1.5rem; color: #f00;"></i>
-                            </button>
-                        </form>
-                        <img
-                            src="<?= $book['image_url'];?>"
-                            class="card-img-top"
-                            alt="<?= $book['title'];?>"
-                        />
-                        <div class="card-body text-center">
-                            <h5 class="card-title"><?= htmlspecialchars($book['title']); ?></h5>
-                            <p class="card-text">
-                                Author: <?= htmlspecialchars($book['author']); ?>
-                            </p>
-                            <a href="/book/read-more?id=<?= $book['id']; ?>" class="btn btn-primary">Read More</a>
+                        <img src="<?= ($bookmark['image_url']); ?>" class="card-img-top" alt="Book Image">
+                        <div class="card-body">
+                            <h5 class="card-title"><?= ($bookmark['title']); ?></h5>
+                            <p class="card-text"><?= ($bookmark['author']); ?></p>
                         </div>
+                        <form method="POST" action="/auth/delete_bookmark">
+                            <input type="hidden" name="bookmark_id" value="<?= $bookmark['bookmark_id']; ?>">
+                            <button class="btn btn-danger btn-sm" type="submit">Remove Bookmark</button>
+                        </form>
                     </div>
-                    
                 </div>
             <?php endforeach; ?>
-        <?php else: ?>
-            <p>You have not bookmarked any books yet.</p>
+        <?php else : ?>
+            <p>No bookmarks found.</p>
         <?php endif; ?>
     </div>
 </div>
 
-<?php require "parts/footer.php"; ?>
+<?php require 'parts/footer.php'; ?>
